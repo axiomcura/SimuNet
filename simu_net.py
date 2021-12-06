@@ -5,10 +5,10 @@ import random
 from copy import deepcopy
 from simunet.common.parsers import *
 from simunet.analysis.methods import *
+from simunet.analysis.network import generate_subnetworks, mutation
+from simunet.analysis.scores import selection_score
 
-
-# TODO: Make sure that the returning list is not the same as the starting list
-def simulate(subnetworks, locus_data , mut_freq=0.05):
+def simulate(subnetworks, locus_data , string_db, mut_freq=0.05):
 	""" Applies genetic algorithm with a set of subnetworks at attempts
 	to select select the best gene network.
 
@@ -19,6 +19,7 @@ def simulate(subnetworks, locus_data , mut_freq=0.05):
 	list
 		mutated subnetworks
 	"""
+
 	# NOTE: creating a copy for position updates
 	# -- reassignment of python lists points to a refrence. Therefore any changes to
 	# -- refrence will be applied to the original list
@@ -33,40 +34,10 @@ def simulate(subnetworks, locus_data , mut_freq=0.05):
 				# -- finding the index of the old gene and replace with new one
 				network[network.index(gene)] = new_gene
 
-	return mut_subnetworks
+	# calculating selection scores
+	# TODO: test algorithm
+	selection_scores = selection_score(mut_subnetworks, string_db)
 
-
-def mutation(locus_idx, gene, loci_data):
-	"""Mutates genes to a different gene from the same locus
-
-	Parameters
-	----------
-	locus_idx : [type]
-		[description]
-	gene : [type]
-		[description]
-	locus_data : dict
-		locus index and associated genes key value pairs
-
-	Returns
-	-------
-	str
-		new gene
-	"""
-	locus_tag = "locus {}".format(locus_idx)
-	genes_arr= loci_data[locus_tag]
-
-	# preventing duplicate mutation
-	while True:
-		# if the randomly selected gene is the same as the input gene
-		# -- pick again
-		new_gene = random.choice(genes_arr)
-		if new_gene == gene:
-			new_gene = random.choice(genes_arr)
-		else:
-			break
-
-	return new_gene
 
 
 def generate_interaction_dict(subnetworks: list, stringDB: StringDB) -> dict:
@@ -85,6 +56,7 @@ def generate_interaction_dict(subnetworks: list, stringDB: StringDB) -> dict:
 
 	"""
 	pass
+
 
 
 
@@ -128,5 +100,3 @@ if __name__ == '__main__':
 
 	print("Simulating with given subnetworks")
 	mut_subnetworks = simulate(subnetworks, loci_input, mut_freq=0.5)
-
-	print(subnetworks == mut_subnetworks)

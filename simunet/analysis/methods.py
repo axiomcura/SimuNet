@@ -24,85 +24,12 @@ def prix_fixe_selection(locus_data):
 	return subnetwork
 
 
-def generate_subnetworks(n, locus_data):
-	"""Generating random subnetworks via prix-fixe method on
-	FA gmt data
-
-	Parameters
-	----------
-	n : int
-		number of subnetworks generatred
-	locus_data : dict
-		gmt locus data
-
-	Returns
-	-------
-	list
-		array of arrays of different randomly generated subnetworks
-	"""
-	subnetworks = []
-	for i in range(n):
-		subnetwork = prix_fixe_selection(locus_data)
-		subnetworks.append(subnetwork)
-	return subnetworks
 
 
 def generate_binned_subnetworks(n, nbins):
     """Generating random subnetworks via prix-fixe method on
     """
-
-
-def generate_random_subnetworks(fa_input, gene_counts, fmt="default"):
-	""" Generates random subnetworks where each gene is selected per locus_name
-	Arguments:
-	---------
-	 fa_input : dict
-		loaded FA loci data
-	Results:
-	-------
-	list
-		Randomly selected genes
-
-	limitation
-	----------
-	algortihm is O(N^2) when generating. Therefore increasing the number of generated
-	random sublist will make it larger
-	"""
-
-
-	# this is the default paramter
-	if fmt == "default":
-		networks = []
-		for gene_list in fa_input.values():
-			try:
-				gene = gene_counts[random.choice(gene_list)]
-			except KeyError:
-				gene = 0
-			networks.append(gene)
-		return networks
-
-	# returns a dictionary instead of an array of values
-	# dictioanry contains gene name and counts as key-value pairs
-	elif fmt == "labeled":
-		labeled_networks = []
-		for gene_list in fa_input.values():
-			try:
-				gene_name = random.choice(gene_list)
-				gene_count = gene_counts[gene_name]
-			except KeyError:
-				gene_count = 0
-			labeled_networks.append(tuple([gene_name, gene_count]))
-		return labeled_networks
-
-	elif fmt == "genes":
-		gene_names = []
-		for gene_list in fa_input.values():
-			gene_name = random.choice(gene_list)
-			gene_names.append(gene_name)
-		return gene_names
-	else:
-		raise ValueError("fmt is not supported")
-
+    pass
 
 def get_connected_genes(string_df: pd.DataFrame):
 	"""
@@ -172,6 +99,4 @@ def label_genes(counts):
     for idx, gene_name in enumerate(counts.keys()):
         labeled_genes[idx] = gene_name
     return labeled_genes
-
-
 

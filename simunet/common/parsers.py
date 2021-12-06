@@ -181,16 +181,16 @@ def parse_input(input_file : str) -> dict:
    Example
    --------
     >>> # this is an example output of this function.
-    >>> parsed_input = {"locus_name1" : ["gene1", "gene2", "gene3", "geneN"],
-    >>>                 "locus_name2" : ["gene1", "gene2", "gene3", "geneN"]}
+    >>> parsed_input = {"locus 1" : ["gene1", "gene2", "gene3", "geneN"],
+    >>>                 "locus 2" : ["gene1", "gene2", "gene3", "geneN"]}
     """
 
     locus_genes = defaultdict(lambda: None)
     with open(input_file, 'r') as infile:
         lines = infile.readlines()
-        for line in lines:
+        for locus_idx, line in enumerate(lines):
             data = line.strip("\n").split("\t")
-            locus = data[1].split()[-1]
+            locus = "locus {}".format(locus_idx+1)
             genes = data[2:]
             locus_genes[locus] = genes
 

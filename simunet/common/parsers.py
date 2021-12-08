@@ -1,4 +1,5 @@
 import sys
+from itertools import permutations
 from collections import defaultdict
 import pandas as pd
 
@@ -54,63 +55,28 @@ class StringDB:
         """ Converts the StringDB object into a pandas object"""
         return pd.read_csv(self.fname, delimiter="\t", names=["gene1", "gene2", "score"])
 
+    def get_paired_score(self, gene1, gene2):
+        """Interaction score between two genes. If query is not found,
+        a score of 0 is returned"
 
-    def get_pair_score(self, locus_name: str, proteins: list, interaction_type="pp") -> list:
-        """ Accepts a list of genes and queries to the database
-        Summary:
-        -------
-        Creates all possible permutations of protein interactions within the protein list.
-        Each pair will be queried into database and returns a score. The database will return
-        'None' if the score is not found and will not be recorded into the results. In addition,
-        a "tracking" list is also implemented to prevent repetitive query. This means that
-        reversed interaction queries will be ignored if the original query has been recorded.
-        Argument
-        -------
-        genes : list
-            list of genes found in the locus
-        interaction_type : str (choices=["pp", "pd", "pr", "rc", "cr", "gl", "pm", "mp"])
-            Interaction type of both genes/molecules. Supported interaction types are:
-            - p:protein - protein interaction
-            - pd: protein -> DNA
-            - pr: protein -> reaction
-            - rc: reaction -> compound
-            - cr: compound -> reaction
-            - gl: genetic lethal relationship
-            - pm: protein-metabolite interaction
-            - mp: metabolite-protein interaction
-        More information about compatibility found here:
-        http://manual.cytoscape.org/en/stable/Supported_Network_File_Formats.html#sif-format
-        Returns
-        -------
-        list
-            Contains a list of strings that describes the interaction type
-            between two genes and its score. This cotnents is what is going
-            to be used to produce the sif file
+        Parameters
+        ----------
+        gene1 : str
+            first gene for query
+        gene2 : str
+            second gene for query
+
+        Return
+        ------
+        float
+            gene density score in network
         """
+        query = "{} {}".format(gene1, gene2)
+        score = self._db[query]
+        if score is None:
+            return 0.0
+        return score
 
-        # type checking
-        if not isinstance(proteins, list):
-            genes = [proteins]
-
-        # getting all possible combinations
-        # -- query all combinations into the database
-        # -- reversed queries are ignored if original query is recorded
-        pairs = permutations(proteins, 2)
-
-        results = []
-        searched = []
-        for gene1, gene2 in pairs:
-            query = "{} {}".format(gene1, gene2)
-            query_rev = "{} {}".format(gene2, gene1)
-            score = self._db[query]
-            if score == None:
-                continue
-            if  query_rev in searched:
-                continue
-            result = "{} {} {} {}".format(gene1, interaction_type, gene2, score)
-            results.append(result)
-            searched.append(query)
-        return results
 
     def is_paired(self, gene1, gene2):
         """ checks if the two genes are paired
@@ -128,11 +94,11 @@ class StringDB:
             Returns True if there's a connection, False if no connection exists
         """
         query = "{} {}".format(gene1, gene2)
-        try:
-            check = self._db[query]
-            return True
-        except KeyError:
+        check = self._db[query]
+        if check is None:
             return False
+        return True
+
 
 def preprocess_gmt(fa_input: dict, gene_counts: dict) -> dict:
 	"""Removes genes from each locus where its count is zero when searched in the StringDB

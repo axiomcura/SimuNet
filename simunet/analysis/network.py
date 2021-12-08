@@ -56,7 +56,3 @@ def mutation(locus_idx, gene, loci_data):
 
 	return new_gene
 
-def mate():
-	"""[summary]
-	"""
-	pass

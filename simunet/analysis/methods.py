@@ -1,9 +1,14 @@
 import random
 from collections import Counter
 from collections import defaultdict
-import pandas as pd
 
+# third party imports
+import pandas as pd
+import numpy as np
+
+# simunet imports
 from simunet.common.errors import NetWorkError
+
 
 def prix_fixe_selection(locus_data):
     """Selects randomly genes within each locus and returns a list of genes
@@ -27,12 +32,58 @@ def prix_fixe_selection(locus_data):
     return subnetwork
 
 
+def bin_data(labeled_gene_counts, gene_ids, bins=128):
+    """Generates a binned dataframe where genes are placed into their
+    appropriate bin based on edge density.
 
+    Arguments
+    ----------
+    labeled_gene_counts : dict
+        labeled data containing gene name as keys and edge density as values
+    gene_ids : dict
+        Unique id added to each gene
+    bins : int, optional (default=128)
+        Number of bins constructed within the binned dataframe
 
-def generate_binned_subnetworks(n, nbins):
-    """Generating random subnetworks via prix-fixe method on
+    Returns
+    -------
+    pd.DataFrame
+        Binned genes based on edge density
+
+    Limitations
+    ------------
+    - Not all bins will have geenes in them because they do not meet the edge density criteria
+    - Creates sub dataframes to handle different bins, increases memory usage
     """
-    pass
+    gene_count_data = tuple(labeled_gene_counts.items())
+
+    # bining data based edge density range using pandas.cut() function
+    df = pd.DataFrame(data=gene_count_data, columns=["gene", "counts"])
+    edges = np.linspace(df["counts"].values.min(), df["counts"].values.max(), bins+1).astype(int)
+    labels = [f'({edges[i]}, {edges[i+1]})' for i in range(len(edges)-1)]
+    z = pd.cut(df["counts"], include_lowest=True, bins=bins, labels=labels).to_frame(name="count_range")
+    binned_data = z.groupby(by=["count_range"])
+
+
+    # creating of for loop for adding gene name, edge_density and bin id
+    dfs = []
+    binned_genes = defaultdict(lambda: None)
+    for bin_id, (name, bin_df) in enumerate(binned_data):
+        end = bin_df.index.tolist()
+        if len(end) == 0:
+            # skip any bins that does not have any data
+            continue
+        bin_df["gene_name"] = [gene_ids[idx] for idx in bin_df.index]
+        bin_df["edge_density"] = [labeled_gene_counts[gene_ids[idx]] for idx in bin_df.index]
+        bin_df["bin"] = bin_id + 1
+        binned_genes[bin_id+1] = bin_df["gene_name"].tolist()
+        dfs.append(bin_df)
+
+    binned_df = pd.concat(dfs)
+
+    return binned_genes
+    # return binned_df
+
 
 def get_connected_genes(string_df: pd.DataFrame):
     """
@@ -104,6 +155,24 @@ def label_genes(counts):
     return labeled_genes
 
 
+def binned_prix_fixe_selction(n_genes, binned_data,):
+    """Randomly select gene from binned genes
+
+    Parameters
+    ----------
+    binned_data : dict
+        binned genes based on their network density
+    """
+
+    network_genes = []
+    for i in range(n_genes):
+        random_key = random.choice(list(binned_data.keys()))
+        gene_arr = binned_data[random_key]
+        random_gene = random.choice(gene_arr)
+        network_genes.append(random_gene)
+    return network_genes
+
+
 def mate(parent1, parent2):
 
     """[summary]
@@ -116,18 +185,11 @@ def mate(parent1, parent2):
         list of genes associated with parent1
     """
     # randomly selecting 6 genes from
-    parent1_genes = random.choices(parent1, k=6)
-    parent2_genes = random.choices(parent2, k=6)
+    parent1_genes = parent1[:6] # first 6
+    parent2_genes = parent2[6:] # last 6
     child_network = parent1_genes + parent2_genes
 
     return child_network
-    # TODO: should I remove duplicated genes from child networks? 
-    # checking for duplicate genes
-    # NOTE: may not be necessary
-    # n_dups = _check_duplicates(child_network)
-    # if n_dups is not None:
-    #     print("WARNING: {} Duplicated genes found in resulting child subnetwork".format(n_dups))
-    #     child_network = _remove_duplicates(child_network)
 
 
 def _check_duplicates(child_network):

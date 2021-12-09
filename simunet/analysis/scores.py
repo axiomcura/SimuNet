@@ -1,5 +1,5 @@
 from collections import defaultdict
-from itertools import permutations
+from itertools import combinations
 
 
 def _transform_to_list(data):
@@ -64,7 +64,6 @@ def selection_score_arr(network, string_db):
 	for idx, network in enumerate(network):
 		key = "net_{}".format(idx+1)
 		network_score = network_edge_desnity_score(network, string_db)
-		# print("score: {}".format(network_score))
 		net_scores[key] = network_score**3
 
 	ls_net_scores = _transform_to_list(net_scores)
@@ -87,7 +86,7 @@ def network_edge_desnity_score(network, string_db):
 	int
 		number of edges in the whole network
 	"""
-	gene_pairs = permutations(network, 2)
+	gene_pairs = combinations(network, 2)
 	matches = []
 	for gene1, gene2 in gene_pairs:
 		is_paired = string_db.is_paired(gene1, gene2)
@@ -115,9 +114,9 @@ def calculate_gene_density_score(network, string_db):
 	"""
 
 	scores = []
-	gene_pairs = permutations(network, 2)
+	gene_pairs = combinations(network, 2)
 	for gene1, gene2, in gene_pairs:
-		score =string_db.get_paired_score(gene1, gene2)
+		score = string_db.get_paired_score(gene1, gene2)
 		scores.append(score)
 	total_score = sum(scores)
 	return total_score

@@ -1,5 +1,4 @@
 import sys
-from itertools import permutations
 from collections import defaultdict
 import pandas as pd
 
@@ -75,7 +74,7 @@ class StringDB:
         score = self._db[query]
         if score is None:
             return 0.0
-        return score
+        return float(score)
 
 
     def is_paired(self, gene1, gene2):
@@ -161,3 +160,22 @@ def parse_input(input_file : str) -> dict:
             locus_genes[locus] = genes
 
     return locus_genes
+
+
+def label_genes(counts):
+    """ Provides genes with a unique number as and id
+
+    Arguments
+    ---------
+	counts : dict
+		Gene counts dictionary where each gene name has as asscoiated value, which is edge density
+
+	Returns
+	--------
+	dict
+		labled genes with unique ids
+    """
+    labeled_genes = defaultdict(lambda: None)
+    for idx, gene_name in enumerate(counts.keys()):
+        labeled_genes[idx] = gene_name
+    return labeled_genes

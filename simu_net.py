@@ -1,12 +1,17 @@
-# common.py
 # used for basic file maniupations
 import argparse
 import random
 from copy import deepcopy
+
+# import third parties
+import pandas as pd
+
+# simunet imports
 from simunet.common.parsers import *
 from simunet.analysis.methods import *
-from simunet.analysis.network import generate_subnetworks, mutation
+from simunet.analysis.network import generate_fa_subnetworks, mutation, generate_uninformative_pop
 from simunet.analysis.scores import selection_score_arr, average_population_density_score
+
 
 def simulate(subnetworks, locus_data , string_db, generations=None, cutoff=None, mut_freq=0.05):
 	"""Applies genetic algorithm with a set of subnetworks at attempts
@@ -29,9 +34,10 @@ def simulate(subnetworks, locus_data , string_db, generations=None, cutoff=None,
 	mut_freq : float, optional
 		mutation rate (default 0.05)
 	"""
+
 	# type checking
-	if not isinstance(subnetworks, list) and not isinstance(subnetworks, list):
-		raise ValueError("Incorrect format, subnetworks1 and subnetworks2 shold be lists. You prvided {}, {}".format(type(subnetworks1), type(subnetworks2)))
+	if not isinstance(subnetworks, list):
+		raise ValueError("Incorrect format, subnetworks should be in list format. You provided {}".format(type(subnetworks)))
 	elif not isinstance(locus_data, dict) and not isinstance(string_db, dict):
 		raise ValueError("Incorrect format, locus_data and string_db shold be dicts. You prvided {}, {}".format(type(locus_data), type(string_db)))
 	elif mut_freq > 1.0:
@@ -44,59 +50,42 @@ def simulate(subnetworks, locus_data , string_db, generations=None, cutoff=None,
 	result_child_networks = defaultdict(lambda: None)
 
 	mut_subnetworks = deepcopy(subnetworks)
-	for network1 in mut_subnetworks[:10]:
-		for locus_idx, gene in enumerate(network1):
+	labled_networks = defaultdict(lambda: None)
+	for network_idx, network in enumerate(mut_subnetworks):
+		net_key = "net_{}".format(network_idx+1)
+		for locus_idx, gene in enumerate(network):
 			if random.random() < mut_freq:
-				print("mutation event on {} from locus {}".format(gene, locus_idx+1))
+
 				new_gene = mutation(locus_idx+1, gene, locus_data)
 
 				# index replacement
 				# -- finding the index of the old gene and replace with new one
-				network1[network1.index(gene)] = new_gene
-
-
+				network[network.index(gene)] = new_gene
+		labled_networks[net_key] = network
 	# calculating selection scores
-	# TODO: test algorithm
-	print("Testing selection ")
 	selection_arr = selection_score_arr(mut_subnetworks, string_db)
 
 	child_networks = []
-	mate_counts = 1
+	mate_counts = 0
 	while True:
+
 		if mate_counts == 5000:
 			break
+
 		# -- select random parent network from selection_arr
-		parent_1 = random.choice(selection_arr)
-		parent_2 = random.choice(selection_arr)
+		# -- use the labled network to get their genes
+		parent1 = random.choice(selection_arr)
+		parent2 = random.choice(selection_arr)
+		parent_1_network = labled_networks[parent1]
+		parent_2_network = labled_networks[parent2]
 
 		# -- using the mating function to get the child network
-		if parent_1 != parent_2:
-			child_network = mate(parent_1, parent_2)
-			child_networks.append(child_network)
-			mate_counts += 1
-
+		# if parent!= parent_2:
+		child_network = mate(parent_1_network, parent_2_network)
+		child_networks.append(child_network)
+		mate_counts += 1
 
 	return child_networks
-
-
-def generate_interaction_dict(subnetworks: list, stringDB: StringDB) -> dict:
-	"""Generates a
-
-	Parameters
-	----------
-	subnetworks : list
-		list of generated subnet works
-	stringDB : StringDB
-		StringDB object
-
-	Returns
-	-------
-	dict
-
-	"""
-	pass
-
-
 
 
 if __name__ == '__main__':
@@ -113,10 +102,10 @@ if __name__ == '__main__':
 						metavar="PARAMETER", help="generates n subnetworks")
 	# parser.add_argument("-o", "--output", type=str, required=False, default="Simple_out",
 	# 					metavar="PARAMETER", help="name of the outfile default='Simple_out'")
-	# parser.add_argument("-g", "--generations", type=int, required=False, default=20,
-	# 					metavar="PARAMETER", help="How many generations to simulate")
-	# parser.add_argument("-c", "--cutoff", type=float, required=False, default=0.1,
-    #                  	metavar="PARAMETER", help="difference in score cutoff. Ends program if covergence is detected")
+	parser.add_argument("-g", "--generations", type=int, required=False, default=15,
+						metavar="PARAMETER", help="How many generations to simulate")
+	parser.add_argument("-c", "--cutoff", type=float, required=False, default=0.05,
+                     	metavar="PARAMETER", help="difference in score cutoff. Ends program if covergence is detected")
 	parser.add_argument('-db', "--database", type=str, metavar="FILE",
 						help="path to database. Default path is `./Data/STRING.txt",
 						default="./db/STRING.txt")
@@ -129,31 +118,68 @@ if __name__ == '__main__':
 
 	# testing inputs
 	# -- getting connecting genes and their counts
-	# -- generating a proprocessed input (removing all 0 counts)
+	# -- bining data based on edge density
 	connected_genes = get_connected_genes(StringDB_df)
 	gene_counts = get_gene_counts(connected_genes)
-	new_fa = preprocess_gmt(loci_input, gene_counts)
+	gene_ids = label_genes(gene_counts)
+	binned_genes = bin_data(gene_counts, gene_ids)
+
 
 	# first step is go generated random networks
 	print("MESSSAGE: Generating {} subnetworks ...".format(args.n_networks))
-	population = generate_subnetworks(n=args.n_networks, locus_data=loci_input)
+	population = generate_fa_subnetworks(n=args.n_networks, locus_data=loci_input)
 	org_population = deepcopy(population) # --> NOTE: used for score after?
 
+	# TODO: generate uninformative network
+	# -- generating uninformative networks
+	uninformative_pop = generate_uninformative_pop(n_pop=1000, binned_genes=binned_genes, n_networks=args.n_networks)
+	print(len(uninformative_pop))
+	print(len(uninformative_pop[0]))
+	exit()
 	print("Simulating with given subnetworks")
 	# creating a for loop using  that controls the nmber of generaetions
 	density_score = defaultdict(lambda: None)
 	populations = defaultdict(lambda: None)
-	population = None
-
-	# TODO: change that value within range function into args.generations argument
-	for gen_idx in range(10):
-		gen_key = "gen_{}".format(gen_idx)
-
+	scores = []
+	for gen_idx in range(args.generations):
+		gen_key = "gen_{}".format(gen_idx+1)
 		# creating next gen population and calulating its score
-		next_gen_pop = simulate(population, loci_input, string_db=db, mut_freq=0.5)
+		next_gen_pop = simulate(population, loci_input, string_db=db, mut_freq=0.05)
 
 		# calulate average network density
 		avg_network_score = average_population_density_score(next_gen_pop, string_db=db)
 		density_score[gen_key] = avg_network_score
 		populations[gen_key] = next_gen_pop
+
+		# checking for convergence
+		# if lower that 0.05 change 3 conseq. times. break
+		if len(scores) > 1:
+			print(gen_key, avg_network_score, abs(avg_network_score - scores[-1]))
+			avg_change = abs(avg_network_score - scores[-1])
+			if avg_change > 0.05:
+				tracked_changes = []
+			elif avg_change < 0.05:
+				tracked_changes.append(avg_change)
+				if len(tracked_changes) == 3:
+					print("convergence at {} generations".format(gen_idx+1))
+					break
+
+		scores.append(avg_network_score)
 		population = next_gen_pop # -> updates the iterator with next gen pop
+
+
+	# TODO: create non-info networks
+	# -- calculate 1000 populations of 5000 subnetworks  weighted average edge density
+
+	# TODO: Now I have two lists of avg. One from GA and on from non-info
+	# n_uninfo_avg  > BEST GA avg -> counts
+	# counts / 1000 (uninformative populations)
+	# --> pvale
+		#0.0001.txt
+
+	# TODO: Write out GMT file
+	# [ gene 1 gene 2 gene3 ] ->
+	# same as FA input with gene score (same as homework 3)
+
+
+	# take top scores of

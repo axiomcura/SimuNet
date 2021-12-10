@@ -1,6 +1,7 @@
 import sys
 from collections import defaultdict
 import pandas as pd
+import numpy as np
 
 class StringDB:
     """ Creates a simple python object that handles lookups into the
@@ -75,6 +76,27 @@ class StringDB:
         if score is None:
             return 0.0
         return float(score)
+
+    def targeted_gene_scoring(self, target_gene, gene_arr):
+        """ search for score by comparing target gene_arr to all genes in a list
+
+        Parameters
+        ----------
+        target_gene : target_gene
+            target gene for query
+        gene_arr : list
+            list of arrays that will be scored along with target gened
+        """
+        scores = []
+        for gene in gene_arr:
+            query = "{} {}".format(target_gene, gene)
+            score = self._db[query]
+            if score is None:
+                score = 0.0
+                scores.append(score)
+            scores.append(float(score))
+        gene_score = sum(scores)
+        return gene_score
 
 
     def is_paired(self, gene1, gene2):

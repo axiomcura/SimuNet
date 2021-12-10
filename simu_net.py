@@ -2,18 +2,20 @@
 import argparse
 import random
 from copy import deepcopy
+from statistics import mean
 
 # import third parties
 import pandas as pd
 
 # simunet imports
+from simunet.common.common import create_gmt_file
 from simunet.common.parsers import *
 from simunet.analysis.methods import *
 from simunet.analysis.network import generate_fa_subnetworks, mutation, generate_uninformative_pop
-from simunet.analysis.scores import selection_score_arr, average_population_density_score
+from simunet.analysis.scores import *
 
 
-def simulate(subnetworks, locus_data , string_db, generations=None, cutoff=None, mut_freq=0.05):
+def simulate(subnetworks, locus_data , string_db, mut_freq=0.05):
 	"""Applies genetic algorithm with a set of subnetworks at attempts
 	to select  the best gene network. Convergence is captured after
 	+3 generation.
@@ -90,22 +92,18 @@ def simulate(subnetworks, locus_data , string_db, generations=None, cutoff=None,
 
 if __name__ == '__main__':
 
-    # CLI options
-	# TODO: fix description
-	# TODO: fix arguments designed for this program
-	description = "simple program for generating SIF to full understand relationships between biological processes."
+	# CLI options
+	description = "Simunet: Program for optimizing random gene networks to find important gene interactions"
 	parser = argparse.ArgumentParser(description=description)
 	required = parser.add_argument_group("Required Arguments")
 	required.add_argument("-i", "--input", type=str, metavar="INPUT",
 						help="input file")
 	parser.add_argument("-n", "--n_networks", type=int, required=False, default=5000,
-						metavar="PARAMETER", help="generates n subnetworks")
-	# parser.add_argument("-o", "--output", type=str, required=False, default="Simple_out",
-	# 					metavar="PARAMETER", help="name of the outfile default='Simple_out'")
-	parser.add_argument("-g", "--generations", type=int, required=False, default=15,
-						metavar="PARAMETER", help="How many generations to simulate")
+						metavar="PARAMETER", help="generates n subnetworks, Default is 5000")
+	parser.add_argument("-g", "--generations", type=int, required=False, default=30,
+						metavar="PARAMETER", help="How many generations to simulate default is 30")
 	parser.add_argument("-c", "--cutoff", type=float, required=False, default=0.05,
-                     	metavar="PARAMETER", help="difference in score cutoff. Ends program if covergence is detected")
+						 metavar="PARAMETER", help="difference in score cutoff. Ends program if covergence is detected. Default is 0.05")
 	parser.add_argument('-db', "--database", type=str, metavar="FILE",
 						help="path to database. Default path is `./Data/STRING.txt",
 						default="./db/STRING.txt")
@@ -126,60 +124,91 @@ if __name__ == '__main__':
 
 
 	# first step is go generated random networks
-	print("MESSSAGE: Generating {} subnetworks ...".format(args.n_networks))
+	print("MESSSAGE: Generating {} subnetworks via prix fixe method...".format(args.n_networks))
 	population = generate_fa_subnetworks(n=args.n_networks, locus_data=loci_input)
 	org_population = deepcopy(population) # --> NOTE: used for score after?
 
-	# TODO: generate uninformative network
-	# -- generating uninformative networks
+	# generating uninformative networks
+	print("MESSAGE: generating non-informative population")
 	uninformative_pop = generate_uninformative_pop(n_pop=1000, binned_genes=binned_genes, n_networks=args.n_networks)
-	print(len(uninformative_pop))
-	print(len(uninformative_pop[0]))
-	exit()
-	print("Simulating with given subnetworks")
+
+	print("MESSAGE: Optimizing FA associated randomly selected networks")
 	# creating a for loop using  that controls the nmber of generaetions
 	density_score = defaultdict(lambda: None)
-	populations = defaultdict(lambda: None)
+	optmized_populations = []
 	scores = []
+	gen_pop_stats = []
 	for gen_idx in range(args.generations):
 		gen_key = "gen_{}".format(gen_idx+1)
+
+		# Calculate statistics of the network
+		stats = get_pop_stats(population, string_db=db)
+		gen_pop_stats.append(stats)
+
+
 		# creating next gen population and calulating its score
 		next_gen_pop = simulate(population, loci_input, string_db=db, mut_freq=0.05)
 
 		# calulate average network density
 		avg_network_score = average_population_density_score(next_gen_pop, string_db=db)
-		density_score[gen_key] = avg_network_score
-		populations[gen_key] = next_gen_pop
 
 		# checking for convergence
 		# if lower that 0.05 change 3 conseq. times. break
 		if len(scores) > 1:
-			print(gen_key, avg_network_score, abs(avg_network_score - scores[-1]))
+			# print(gen_key, avg_network_score, abs(avg_network_score - scores[-1]))
 			avg_change = abs(avg_network_score - scores[-1])
 			if avg_change > 0.05:
 				tracked_changes = []
 			elif avg_change < 0.05:
-				tracked_changes.append(avg_change)
+				tracked_changes.append(avg_network_score)
 				if len(tracked_changes) == 3:
 					print("convergence at {} generations".format(gen_idx+1))
 					break
 
+		optmized_populations.append(next_gen_pop)
 		scores.append(avg_network_score)
 		population = next_gen_pop # -> updates the iterator with next gen pop
 
-
-	# TODO: create non-info networks
-	# -- calculate 1000 populations of 5000 subnetworks  weighted average edge density
-
-	# TODO: Now I have two lists of avg. One from GA and on from non-info
-	# n_uninfo_avg  > BEST GA avg -> counts
-	# counts / 1000 (uninformative populations)
-	# --> pvale
-		#0.0001.txt
-
-	# TODO: Write out GMT file
-	# [ gene 1 gene 2 gene3 ] ->
-	# same as FA input with gene score (same as homework 3)
+	print("MESSAGE: Calculating populations score of non-informative populations")
+	pop_avg_score = defaultdict(lambda: None)
+	for idx, population in enumerate(uninformative_pop):
+		pop_key = "pop_{}".format(idx+1)
+		network_scores = []
+		for network in population:
+			# calculate score
+			network_score = calculate_gene_density_score(network=network, string_db=db)
+			network_scores.append(network_score)
+		pop_avg_score[pop_key] = np.mean(np.array(network_scores))
 
 
-	# take top scores of
+	print("MESSAGE: calculating p value")
+	uniformative_scores = list(pop_avg_score.values())
+	p_val = round(p_value_score(scores[-1], uniformative_scores), 4)
+	print("p_value is {}".format(p_val))
+
+	print("MESsAGE: Saving FA sta")
+	columns = ['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']
+	pd.DataFrame(gen_pop_stats, columns=columns).round(3).to_csv("GA_stats.txt", index=False)
+
+	# creating gmt file
+	print("MESSAGE: creating gmt file")
+	create_gmt_file(loci_input, org_population, db)
+
+	# top 10 networks of optomized population
+	print("MESSAGE: saving top 10 networks of optomized population")
+	opt_pop = optmized_populations[-1]
+	opt_pop_scores = []
+	for idx, network in enumerate(opt_pop):
+		net_key = "Network{}".format(idx+1)
+		score = calculate_gene_density_score(network, string_db=db)
+		result = [net_key, score]
+		opt_pop_scores.append(result)
+
+	cols = ["network", "score"]
+	top_10 = pd.DataFrame(opt_pop_scores, columns=cols).sort_values(by=["score"], ascending=False).iloc[:10]
+	print(top_10)
+	top_network = top_10.iloc[0]["network"]
+	outname = 'Day3_Output_{}_pval{}.txt'.format(top_network, p_val)
+	top_10.to_csv(outname, index=False)
+
+	print("complete!")

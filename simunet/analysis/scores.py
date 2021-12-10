@@ -1,6 +1,7 @@
 from collections import defaultdict
 from itertools import combinations
-
+import numpy as np
+import pandas as pd
 
 def _transform_to_list(data):
 	"""Converts dictioanry to string
@@ -142,6 +143,43 @@ def average_population_density_score(population, string_db):
 
 	avg_population_score = sum(population_density_scores)/len(population_density_scores)
 	return avg_population_score
+
+
+def p_value_score(score, arr_vals):
+	"""Calculate P value using permutations
+
+	Parameters
+	----------
+	score : int
+		optimized GA average score pop
+	arr_vals : list
+		array of avg populations scores
+	"""
+	scores_arr = np.array(arr_vals)
+	counts = (scores_arr < score).sum()
+	p_val = counts/len(arr_vals)
+	return p_val
+
+
+def get_pop_stats(population, string_db):
+	"""gets generall statisticsl of a population
+
+	Parameters
+	----------
+	population : [type]
+		[description]
+	"""
+	network_scores = []
+	for network in population:
+		score = calculate_gene_density_score(network, string_db)
+		network_scores.append(score)
+
+	# retruns stats file and creates into 1D list
+	# -- .flatten() nested np.ndarrays
+	# -- .tolist() converts np.array into python list
+	stats = pd.DataFrame(network_scores).round(3).describe().values.flatten().tolist()
+
+	return stats
 
 
 
